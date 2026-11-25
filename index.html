@@ -151,12 +151,16 @@ function textWidth(str, font) {
   return c.measureText(str).width * m.sx;
 }
 function fontLineHeight(font) { return font.h; }
-function fontBaseline(font) { return font.kind === 'mono' ? Math.round(font.h * 0.8) : vectorMetrics(font).baseline; }
+function fontBaseline(font) { return font.kind === 'mono' ? (font.capFull ? font.h : Math.round(font.h * 0.8)) : vectorMetrics(font).baseline; }
 
 function drawTextLine(ctx, str, font, x, y /* topo da linha */, color) {
   ctx.fillStyle = color;
   if (font.kind === 'mono') {
-    const px = font.h * 1.02;
+    let px = font.h * 1.02;
+    if (font.capFull) { // altura da maiúscula = altura da célula
+      ctx.font = `700 100px ${MONO_FONT}`; const m = ctx.measureText('H');
+      const cap = (m.actualBoundingBoxAscent || 71) / 100; px = font.h / cap;
+    }
     ctx.font = `700 ${px}px ${MONO_FONT}`;
     ctx.textBaseline = 'alphabetic';
     const adv = ctx.measureText('M').width || px * 0.6;
@@ -846,13 +850,21 @@ async function parseEPL(src, cfg, warn) {
 /* ===================================================================
    PPLA (Argox) — formato "DPL-like"
    =================================================================== */
+// Fontes internas PPLA/DPL — [altura, largura, espaçamento] em pontos (tabelas oficiais Datamax DPL)
+const PPLA_FONTS_203 = { 0: [7, 5, 1], 1: [13, 7, 2], 2: [18, 10, 2], 3: [27, 14, 2], 4: [36, 18, 3], 5: [52, 18, 3], 6: [64, 32, 4], 7: [32, 15, 5], 8: [28, 15, 5] };
+const PPLA_FONTS_300 = { 0: [10, 7, 1], 1: [19, 10, 3], 2: [27, 15, 3], 3: [40, 21, 3], 4: [53, 27, 4], 5: [77, 27, 4], 6: [95, 47, 6], 7: [47, 22, 7], 8: [41, 22, 7] };
+// Fontes 3–8 só têm maiúsculas: minúsculas saem em maiúscula e a letra ocupa a altura toda da célula.
+const PPLA_UPPER = new Set([3, 4, 5, 6, 7, 8]);
 function pplaFont(id, cm, dm, dpi) {
-  const t = { 0: [8, 5], 1: [13, 7], 2: [18, 10], 3: [27, 14], 4: [36, 18], 5: [52, 28], 6: [64, 32], 7: [32, 15], 8: [28, 15] };
-  let [h, w] = t[id] || t[2];
-  const k = dpi / 203; h = Math.round(h * k); w = Math.round(w * k);
-  const cw = w * Math.max(1, cm), gap = Math.max(1, Math.round(cw * 0.15));
-  return { kind: 'mono', h: h * Math.max(1, dm), cw: cw - gap, gap };
+  const tbl = dpi >= 300 ? PPLA_FONTS_300 : PPLA_FONTS_203;
+  let [h, w, sp] = tbl[id] || tbl[2];
+  const k = dpi >= 600 ? 2 : dpi < 200 ? 0.75 : 1;
+  h = Math.round(h * k); w = Math.round(w * k); sp = Math.max(1, Math.round(sp * k));
+  cm = Math.max(1, cm); dm = Math.max(1, dm);
+  return { kind: 'mono', h: h * dm, cw: w * cm, gap: sp * cm, upper: PPLA_UPPER.has(id), capFull: PPLA_UPPER.has(id) };
 }
+// Fonte 9 (suave/escalável): "Ann" = nn pontos; "0nn" = tabela 001..010
+const PPLA_F9_0NN = { 1: 6, 2: 8, 3: 10, 4: 12, 5: 14, 6: 18, 7: 24, 8: 30, 9: 36, 10: 48 };
 const PPLA_BC = {
   A: 'code39', B: 'upca', C: 'upce', D: 'interleaved2of5', E: 'code128', F: 'ean13', G: 'ean8', H: 'code39',
   I: 'rationalizedCodabar', J: 'interleaved2of5', K: 'plessey', L: 'interleaved2of5', O: 'code93', P: 'postnet',
@@ -960,12 +972,14 @@ async function parsePPLA(src, cfg, warn) {
     if (/[0-9]/.test(b)) { // texto
       let font;
       if (b === '9') {
-        let pts = 10; const mm = eee.match(/^[A-Za-z]?(\d{2,3})$/); if (mm) pts = int(mm[1], 10);
+        let pts = 10;
+        if (/^[A-Za-z]\d\d$/.test(eee)) pts = int(eee.slice(1), 10);
+        else if (/^\d{3}$/.test(eee)) pts = PPLA_F9_0NN[int(eee, 3)] || 10;
         if (pts < 4) pts = 10;
         const hpx = pts * dpi / 72;
         font = { kind: 'vector', h: hpx, w: hpx * Math.max(1, parseInt(c, 36) || 1) / Math.max(1, parseInt(d, 36) || 1) };
       } else font = pplaFont(+b, parseInt(c, 36) || 1, parseInt(d, 36) || 1, dpi);
-      const res = makeTextCanvas(data, font);
+      const res = makeTextCanvas(font.upper ? data.toUpperCase() : data, font);
       lab.ops.push({ t: 'canvas', canvas: res.canvas, x, y, rot, mode: 'anchor', ax: 0, ay: anchorBottom(res.canvas) });
       continue;
     }
@@ -1142,8 +1156,13 @@ async function render() {
     const paper = document.createElement('div'); paper.className = 'paper';
     const img = new Image(); img.src = canvas.toDataURL('image/png'); img.alt = 'Etiqueta ' + (idx + 1);
     let scale;
-    if (zoomSel === 'fit') { const avail = Math.max(200, stage.clientWidth - 70); scale = Math.min(avail / canvas.width, 1.6); }
+    if (zoomSel === 'fit') { const avail = Math.max(200, stage.clientWidth - 70); scale = Math.min(avail / canvas.width, 2); }
     else scale = +zoomSel;
+    // Nitidez: ampliando, usa múltiplo inteiro de pixels de tela (pontos quadrados e iguais);
+    // reduzindo, deixa o navegador suavizar (evita linhas finas sumindo/serrilhado).
+    const dpr = window.devicePixelRatio || 1;
+    if (scale * dpr >= 1) { scale = Math.max(1, Math.floor(scale * dpr)) / dpr; img.style.imageRendering = 'pixelated'; }
+    else img.style.imageRendering = 'auto';
     img.style.width = Math.round(canvas.width * scale) + 'px'; img.style.height = Math.round(canvas.height * scale) + 'px';
     img.addEventListener('mousemove', ev => {
       const r = img.getBoundingClientRect();
