@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visualizador de Etiquetas — ZPL · EPL · PPLA</title>
+<style>
+  @font-face{font-family:"Roboto Condensed";font-weight:700;src:url(fonts/roboto-condensed-latin-700-normal.woff2) format("woff2")}
+  @font-face{font-family:"Roboto Mono";font-weight:700;src:url(fonts/roboto-mono-latin-700-normal.woff2) format("woff2")}
+  :root{
+    --bg:#eceae4; --panel:#f8f7f3; --ink:#1d1d1b; --muted:#6b6960; --line:#d6d3c9;
+    --accent:#d9481c; --accent-ink:#fff; --code-bg:#1f2124; --code-ink:#e8e6df; --warn:#9a5b00;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#17181a; --panel:#202225; --ink:#eceae4; --muted:#9a978d; --line:#33363a; --code-bg:#121315; --code-ink:#e8e6df; --warn:#f0b050; }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.2px;display:flex;align-items:center;gap:8px}
+  header h1 .tag{font-family:ui-monospace,Consolas,monospace;font-size:11px;font-weight:500;background:var(--ink);color:var(--bg);padding:2px 6px;border-radius:3px}
+  .spacer{flex:1}
+  main{flex:1;display:grid;grid-template-columns:minmax(320px,42%) 1fr;min-height:0}
+  @media (max-width:860px){ main{grid-template-columns:1fr;grid-template-rows:auto auto} }
+  .left{display:flex;flex-direction:column;border-right:1px solid var(--line);min-height:0;min-width:0}
+  .toolbar{display:flex;gap:8px;padding:10px 12px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);background:var(--panel)}
+  .opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px 10px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+  label.f{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  select,input[type=number],input[type=text]{font:inherit;font-size:13px;padding:5px 7px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);min-width:0;width:100%}
+  button,.btn{font:inherit;font-size:13px;padding:6px 11px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);cursor:pointer;white-space:nowrap}
+  button:hover,.btn:hover{border-color:var(--ink)}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  textarea{flex:1;min-height:260px;resize:none;border:0;outline:0;padding:12px 14px;font-family:ui-monospace,Consolas,ui-monospace,monospace;font-size:12.5px;line-height:1.55;background:var(--code-bg);color:var(--code-ink);tab-size:4;white-space:pre;overflow:auto}
+  .drop{outline:3px dashed var(--accent);outline-offset:-8px}
+  .right{display:flex;flex-direction:column;min-height:0;min-width:0}
+  .status{display:flex;gap:14px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel);font-size:12.5px;flex-wrap:wrap}
+  .status .pill{font-family:ui-monospace,Consolas,monospace;font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
+  .status .pill.lang{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .stage{flex:1;overflow:auto;padding:28px;display:flex;flex-direction:column;align-items:center;gap:26px;
+    background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:16px 16px}
+  .labelwrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .labelwrap .cap{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--muted)}
+  .paper{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15),0 8px 24px rgba(0,0,0,.12);border-radius:6px;line-height:0;position:relative}
+  .paper img{image-rendering:pixelated;image-rendering:crisp-edges;display:block;border-radius:6px}
+  .warns{max-height:140px;overflow:auto;border-top:1px solid var(--line);background:var(--panel);font-size:12px;padding:8px 14px;color:var(--warn);font-family:ui-monospace,Consolas,monospace}
+  .warns:empty{display:none}
+  .warns div{padding:1px 0}
+  .coord{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted);min-width:140px}
+  .hint{font-size:12px;color:var(--muted)}
+  .empty{color:var(--muted);text-align:center;margin-top:60px;line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <h1>Visualizador de Etiquetas <span class="tag">ZPL</span><span class="tag">EPL</span><span class="tag">PPLA</span></h1>
+  <div class="spacer"></div>
+  <span class="hint">Cole o código ou arraste o arquivo .txt / .prn para o editor</span>
+</header>
+<main>
+  <section class="left">
+    <div class="toolbar">
+      <button class="primary" id="btnOpen">Abrir arquivo…</button>
+      <input type="file" id="file" accept=".txt,.prn,.zpl,.epl,.ppla,.lbl,text/plain" hidden>
+      <select id="example" style="width:auto">
+        <option value="">Exemplos…</option>
+        <option value="zpl">ZPL (Zebra)</option>
+        <option value="epl">EPL2 (Zebra / Elgin)</option>
+        <option value="ppla">PPLA (Argox)</option>
+      </select>
+      <button id="btnClear">Limpar</button>
+    </div>
+    <div class="opts">
+      <label class="f">Linguagem
+        <select id="lang"><option value="auto">Detectar</option><option value="zpl">ZPL</option><option value="epl">EPL</option><option value="ppla">PPLA</option></select>
+      </label>
+      <label class="f">Resolução
+        <select id="dpi"><option value="152">152 dpi (6 dpmm)</option><option value="203" selected>203 dpi (8 dpmm)</option><option value="300">300 dpi (12 dpmm)</option><option value="600">600 dpi (24 dpmm)</option></select>
+      </label>
+      <label class="f">Largura (mm)<input type="number" id="wmm" value="100" min="5" step="1"></label>
+      <label class="f">Altura (mm)<input type="number" id="hmm" value="50" min="5" step="1"></label>
+      <label class="f">Tamanho
+        <select id="sizeMode"><option value="file">Usar do arquivo, se houver</option><option value="manual">Sempre o informado</option></select>
+      </label>
+      <label class="f">Origem PPLA
+        <select id="pplaOrigin"><option value="bottom">Inferior esquerda</option><option value="top">Superior esquerda</option></select>
+      </label>
+      <label class="f">Girar visualização
+        <select id="viewRot"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select>
+      </label>
+      <label class="f">Zoom
+        <select id="zoom"><option value="fit">Ajustar</option><option value="0.5">50%</option><option value="1">100% (1 ponto = 1 px)</option><option value="1.5">150%</option><option value="2">200%</option><option value="3">300%</option></select>
+      </label>
+    </div>
+    <textarea id="src" spellcheck="false" placeholder="Cole aqui o código ZPL, EPL ou PPLA…"></textarea>
+  </section>
+  <section class="right">
+    <div class="status">
+      <span class="pill lang" id="stLang">—</span>
+      <span class="pill" id="stSize">—</span>
+      <span class="pill" id="stCount">—</span>
+      <span class="spacer"></span>
+      <span class="coord" id="coord"></span>
+    </div>
+    <div class="stage" id="stage"><div class="empty">Nenhuma etiqueta ainda.<br>Abra um arquivo, cole o código ou escolha um exemplo.</div></div>
+    <div class="warns" id="warns"></div>
+  </section>
+</main>
+
+<script src="vendor/bwip-js-min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   Visualizador de etiquetas — ZPL / EPL2 / PPLA
+   Arquitetura: cada linguagem tem um parser que gera uma lista de
+   "operações" em pontos (dots) da impressora; o renderizador desenha
+   essas operações num canvas do tamanho exato da etiqueta.
+   ===================================================================== */
+
+/* ------------------------- utilidades ------------------------------ */
+const $ = id => document.getElementById(id);
+const num = (v, d) => { const n = parseFloat(v); return isFinite(n) ? n : d; };
+const int = (v, d) => { const n = parseInt(v, 10); return isFinite(n) ? n : d; };
+const VECTOR_FONT = '"Roboto Condensed","Arial Narrow","Liberation Sans Narrow",Arial,sans-serif';
+const MONO_FONT = '"Roboto Mono","DejaVu Sans Mono",Consolas,"Courier New",monospace';
+
+function newCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h));
+  const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  return c;
+}
+
+class Label {
+  constructor(w, h) { this.w = w; this.h = h; this.ops = []; this.rot180 = false; this.copies = 1; }
+}
+
+/* ------------------------- texto ----------------------------------- */
+// font: {kind:'vector', h, w}  ou  {kind:'mono', h, cw, gap}
+let measureCtx = null;
+function mctx() { if (!measureCtx) measureCtx = newCanvas(4, 4).getContext('2d'); return measureCtx; }
+
+function vectorMetrics(font) {
+  const px = font.h;
+  const sx = (font.w || font.h) / font.h;
+  return { px, sx, css: `700 ${px}px ${VECTOR_FONT}`, baseline: Math.round(px * 0.78) };
+}
+function textWidth(str, font) {
+  if (font.kind === 'mono') return str.length * (font.cw + font.gap);
+  const m = vectorMetrics(font); const c = mctx(); c.font = m.css;
+  return c.measureText(str).width * m.sx;
+}
+function fontLineHeight(font) { return font.h; }
+function fontBaseline(font) { return font.kind === 'mono' ? Math.round(font.h * 0.8) : vectorMetrics(font).baseline; }
+
+function drawTextLine(ctx, str, font, x, y /* topo da linha */, color) {
+  ctx.fillStyle = color;
+  if (font.kind === 'mono') {
+    const px = font.h * 1.02;
+    ctx.font = `700 ${px}px ${MONO_FONT}`;
+    ctx.textBaseline = 'alphabetic';
+    const adv = ctx.measureText('M').width || px * 0.6;
+    const sx = font.cw / adv;
+    const base = y + fontBaseline(font);
+    for (let i = 0; i < str.length; i++) {
+      ctx.save();
+      ctx.translate(x + i * (font.cw + font.gap), base);
+      ctx.scale(sx, 1);
+      ctx.fillText(str[i], 0, 0);
+      ctx.restore();
+    }
+  } else {
+    const m = vectorMetrics(font);
+    ctx.font = m.css; ctx.textBaseline = 'alphabetic';
+    ctx.save(); ctx.translate(x, y + m.baseline); ctx.scale(m.sx, 1); ctx.fillText(str, 0, 0); ctx.restore();
+  }
+}
+
+function wrapText(text, font, width) {
+  const out = [];
+  for (const para of text.split('\n')) {
+    const words = para.split(' ');
+    let line = '';
+    for (const w of words) {
+      const t = line ? line + ' ' + w : w;
+      if (textWidth(t, font) <= width || !line) line = t;
+      else { out.push(line); line = w; }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+// Cria canvas com o texto. block = {width, maxLines, spacing, justify}
+function makeTextCanvas(text, font, block) {
+  const lh = fontLineHeight(font);
+  if (!block) {
+    const w = Math.max(1, Math.ceil(textWidth(text, font)) + 1);
+    const c = newCanvas(w, lh); drawTextLine(c.getContext('2d'), text, font, 0, 0, '#000');
+    return { canvas: c, baseline: fontBaseline(font) };
+  }
+  let lines = wrapText(text, font, block.width);
+  if (block.maxLines && lines.length > block.maxLines) {
+    const keep = lines.slice(0, block.maxLines);
+    keep[keep.length - 1] = [keep[keep.length - 1], ...lines.slice(block.maxLines)].join(' ');
+    lines = keep;
+  }
+  const n = Math.max(lines.length, block.fixedLines ? block.maxLines : 0);
+  const step = lh + (block.spacing || 0);
+  const c = newCanvas(block.width, n * step - (block.spacing || 0));
+  const ctx = c.getContext('2d');
+  lines.forEach((ln, i) => {
+    const tw = textWidth(ln, font); let x = 0;
+    if (block.justify === 'C') x = (block.width - tw) / 2;
+    else if (block.justify === 'R') x = block.width - tw;
+    if (block.justify === 'J' && i < lines.length - 1 && ln.includes(' ')) {
+      const words = ln.split(' '); const tot = words.reduce((a, w) => a + textWidth(w, font), 0);
+      const gap = (block.width - tot) / (words.length - 1); let xx = 0;
+      words.forEach(w => { drawTextLine(ctx, w, font, xx, i * step, '#000'); xx += textWidth(w, font) + gap; });
+    } else drawTextLine(ctx, ln, font, Math.round(x), i * step, '#000');
+  });
+  return { canvas: c, baseline: (n - 1) * step + fontBaseline(font) };
+}
+
+/* ------------------------- códigos de barras ----------------------- */
+const RATIO_TYPES = new Set(['code39', 'code39ext', 'interleaved2of5', 'rationalizedCodabar', 'code11', 'industrial2of5', 'matrix2of5', 'datalogic2of5', 'iata2of5', 'coop2of5']);
+
+function eanCheck(d) {
+  let s = 0; const r = d.split('').reverse();
+  r.forEach((c, i) => s += (+c) * (i % 2 === 0 ? 3 : 1));
+  return String((10 - s % 10) % 10);
+}
+function prepEAN(data, len) { // len = dígitos sem verificador
+  let d = data.replace(/\D/g, '');
+  if (d.length > len) d = d.slice(0, len);
+  d = d.padStart(len, '0');
+  return d + eanCheck(d);
+}
+
+/* spec: {bcid, text, opts, module, ratio, height, hr, hrAbove, hrText, rowHeight}
+   devolve {canvas, top, bottom} — top/bottom = faixa das barras no canvas */
+function makeBarcodeCanvas(spec, hrFont) {
+  const raw = bwipjs.raw(spec.bcid, spec.text, Object.assign({}, spec.opts || {}));
+  const sym = raw[0];
+  const mod = Math.max(1, Math.round(spec.module || 2));
+  if (sym.pixs) { // 2D
+    const cols = sym.pixx, rows = sym.pixy;
+    const mh = spec.rowHeight ? Math.max(1, Math.round(spec.rowHeight)) : mod;
+    const c = newCanvas(cols * mod, rows * mh); const ctx = c.getContext('2d'); ctx.fillStyle = '#000';
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++)
+      if (sym.pixs[y * cols + x]) ctx.fillRect(x * mod, y * mh, mod, mh);
+    return { canvas: c, top: 0, bottom: c.height };
+  }
+  const ratio = spec.ratio || 3;
+  const wide = Math.max(mod + 1, Math.round(mod * ratio));
+  const isRatio = RATIO_TYPES.has(spec.bcid);
+  const widths = sym.sbs.map(v => isRatio ? (v > 1.01 ? wide : mod) : Math.round(v * mod));
+  const total = widths.reduce((a, b) => a + b, 0);
+  const h = Math.max(1, Math.round(spec.height || 50));
+  let textH = 0, gap = 0;
+  const hr = spec.hr && spec.hrText;
+  if (hr) { textH = fontLineHeight(hrFont); gap = Math.max(2, Math.round(hrFont.h * 0.15)); }
+  const RETAIL = { ean13: { guards: [[0, 3], [45, 50], [92, 95]], groups: [[1, 7, 3, 45], [7, 13, 50, 92]], lead: 1 },
+                   ean8: { guards: [[0, 3], [31, 36], [64, 67]], groups: [[0, 4, 3, 31], [4, 8, 36, 64]], lead: 0 },
+                   upca: { guards: [[0, 10], [45, 50], [85, 95]], groups: [[1, 6, 10, 45], [6, 11, 50, 85]], lead: 1, trail: 1 } };
+  const rt = hr && !spec.hrAbove && RETAIL[spec.bcid];
+  if (rt) {
+    const dw = textWidth('0', hrFont), pad = Math.round(dw + mod * 2);
+    const left = rt.lead ? pad : 0, right = rt.trail ? pad : 0;
+    const ext = Math.round(textH / 2 + gap);
+    const c = newCanvas(left + total + right, h + textH + gap);
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#000';
+    let x = 0, m = 0;
+    sym.sbs.forEach((v, i) => {
+      const w = Math.round(v * mod);
+      if (i % 2 === 0) { const g = rt.guards.some(([a, b]) => m >= a && m < b); ctx.fillRect(left + x, 0, w, h + (g ? ext : 0)); }
+      x += w; m += v;
+    });
+    const t = spec.hrText, ty = h + gap;
+    if (rt.lead) drawTextLine(ctx, t[0], hrFont, 0, ty, '#000');
+    if (rt.trail) drawTextLine(ctx, t[t.length - 1], hrFont, left + total + mod * 2, ty, '#000');
+    for (const [a, b, m0, m1] of rt.groups) {
+      const str = t.slice(a, b), tw = textWidth(str, hrFont);
+      drawTextLine(ctx, str, hrFont, Math.round(left + (m0 + m1) / 2 * mod - tw / 2), ty, '#000');
+    }
+    return { canvas: c, top: 0, bottom: h };
+  }
+  const c = newCanvas(total, h + (hr ? textH + gap : 0));
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#000';
+  const top = hr && spec.hrAbove ? textH + gap : 0;
+  let x = 0;
+  widths.forEach((w, i) => { if (i % 2 === 0) ctx.fillRect(x, top, w, h); x += w; });
+  if (hr) {
+    const tw = textWidth(spec.hrText, hrFont);
+    const ty = spec.hrAbove ? 0 : h + gap;
+    drawTextLine(ctx, spec.hrText, hrFont, Math.round((total - tw) / 2), ty, '#000');
+  }
+  return { canvas: c, top, bottom: top + h };
+}
+
+function errorCanvas(w, h, msg) {
+  const c = newCanvas(Math.max(w, 60), Math.max(h, 30)); const ctx = c.getContext('2d');
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+  ctx.strokeRect(1, 1, c.width - 2, c.height - 2);
+  ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(c.width, c.height); ctx.moveTo(c.width, 0); ctx.lineTo(0, c.height); ctx.stroke();
+  return c;
+}
+
+/* ------------------------- imagens (bitmaps) ----------------------- */
+function bitmapCanvas(bytes, bpr, rows, oneIsBlack = true, mx = 1, my = 1) {
+  const w = bpr * 8;
+  const c = newCanvas(w, rows); const ctx = c.getContext('2d');
+  const img = ctx.createImageData(w, rows); const d = img.data;
+  for (let y = 0; y < rows; y++) for (let x = 0; x < w; x++) {
+    const b = bytes[y * bpr + (x >> 3)] || 0; const bit = (b >> (7 - (x & 7))) & 1;
+    if (bit === (oneIsBlack ? 1 : 0)) { const o = (y * w + x) * 4; d[o + 3] = 255; }
+  }
+  ctx.putImageData(img, 0, 0);
+  if (mx === 1 && my === 1) return c;
+  const s = newCanvas(w * mx, rows * my); const sctx = s.getContext('2d'); sctx.imageSmoothingEnabled = false;
+  sctx.drawImage(c, 0, 0, s.width, s.height); return s;
+}
+
+/* ------------------------- renderizador ---------------------------- */
+// Operações:
+//  {t:'shape', path:(ctx)=>void, color:'B'|'W', rev}
+//  {t:'canvas', canvas, x, y, rot:0|90|180|270, mode:'bbox'|'anchor', ax, ay, rev, color}
+function placeCanvas(ctx, op) {
+  let src = op.canvas;
+  if (op.rev || op.color === 'W') { // tinge de branco
+    const t = newCanvas(src.width, src.height); const tc = t.getContext('2d');
+    tc.drawImage(src, 0, 0); tc.globalCompositeOperation = 'source-in'; tc.fillStyle = '#fff'; tc.fillRect(0, 0, t.width, t.height);
+    src = t;
+  }
+  ctx.save();
+  if (op.rev) ctx.globalCompositeOperation = 'difference';
+  const w = src.width, h = src.height, rot = ((op.rot || 0) % 360 + 360) % 360;
+  ctx.translate(Math.round(op.x), Math.round(op.y));
+  if (op.mode === 'bboxbl') { ctx.translate(0, -(rot % 180 ? w : h)); }
+  if (op.mode === 'bbox' || op.mode === 'bboxbl') {
+    if (rot === 90) ctx.translate(h, 0); else if (rot === 180) ctx.translate(w, h); else if (rot === 270) ctx.translate(0, w);
+    ctx.rotate(rot * Math.PI / 180);
+    ctx.drawImage(src, 0, 0);
+  } else {
+    ctx.rotate(rot * Math.PI / 180);
+    ctx.drawImage(src, -Math.round(op.ax || 0), -Math.round(op.ay || 0));
+  }
+  ctx.restore();
+}
+
+function renderLabel(label) {
+  const c = newCanvas(label.w, label.h); const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  if (label.offY) ctx.translate(0, label.offY);
+  for (const op of label.ops) {
+    try {
+      if (op.t === 'shape') {
+        ctx.save();
+        if (op.rev) { ctx.globalCompositeOperation = 'difference'; ctx.fillStyle = '#fff'; }
+        else ctx.fillStyle = op.color === 'W' ? '#fff' : '#000';
+        ctx.beginPath(); op.path(ctx); ctx.fill('evenodd'); ctx.restore();
+      } else if (op.t === 'canvas') placeCanvas(ctx, op);
+    } catch (e) { console.warn(e); }
+  }
+  if (label.rot180) {
+    const r = newCanvas(c.width, c.height); const rc = r.getContext('2d');
+    rc.translate(c.width, c.height); rc.rotate(Math.PI); rc.drawImage(c, 0, 0); return r;
+  }
+  return c;
+}
+
+// formas geométricas
+function roundRectPath(ctx, x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath();
+}
+function boxOp(x, y, w, h, t, color, rev, rounding /*0..8*/, tv) {
+  // t = espessura horizontal das linhas laterais; tv = espessura das linhas sup/inf (default t)
+  tv = tv == null ? t : tv;
+  const rad = rounding ? (rounding / 8) * Math.min(w, h) / 2 : 0;
+  return { t: 'shape', color, rev, bb: [x, y, w, h], path: ctx => {
+    roundRectPath(ctx, x, y, w, h, rad);
+    if (2 * t < w && 2 * tv < h) roundRectPath(ctx, x + t, y + tv, w - 2 * t, h - 2 * tv, Math.max(0, rad - Math.max(t, tv)));
+  } };
+}
+function ellipseOp(x, y, w, h, t, color, rev) {
+  return { t: 'shape', color, rev, path: ctx => {
+    ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+    if (2 * t < w && 2 * t < h) { ctx.moveTo(x + w - t, y + h / 2); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - t, h / 2 - t, 0, 0, Math.PI * 2); }
+  } };
+}
+function diagOp(x, y, w, h, t, color, rev, dir) {
+  return { t: 'shape', color, rev, path: ctx => {
+    if (dir === 'L') { ctx.moveTo(x, y); ctx.lineTo(x + t, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - t, y + h); }
+    else { ctx.moveTo(x, y + h); ctx.lineTo(x + t, y + h); ctx.lineTo(x + w, y); ctx.lineTo(x + w - t, y); }
+    ctx.closePath();
+  } };
+}
+function lineOp(x1, y1, x2, y2, t, color, rev) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len * t / 2, ny = dx / len * t / 2;
+  return { t: 'shape', color, rev, path: ctx => {
+    ctx.moveTo(x1 + nx, y1 + ny); ctx.lineTo(x2 + nx, y2 + ny); ctx.lineTo(x2 - nx, y2 - ny); ctx.lineTo(x1 - nx, y1 - ny); ctx.closePath();
+  } };
+}
+
+/* ===================================================================
+   ZPL
+   =================================================================== */
+const ZPL_BITMAP = { // [altura, largura, espaçamento] a 8 dpmm
+  A: [9, 5, 1], B: [11, 7, 2], C: [18, 10, 2], D: [18, 10, 2], E: [28, 15, 5], F: [26, 13, 3], G: [60, 40, 8], H: [21, 13, 6], GS: [24, 24, 0]
+};
+const ZPL_BITMAP_12 = { E: [42, 20, 4], H: [34, 22, 6] };
+
+function zplFont(fontId, h, w, dpmm) {
+  const id = (fontId || '0').toUpperCase();
+  let base = ZPL_BITMAP[id];
+  if (dpmm >= 12 && ZPL_BITMAP_12[id]) base = ZPL_BITMAP_12[id];
+  if (!base) { // fonte escalável (0, @, P–Z, fontes baixadas)
+    if (!h && !w) h = w = 15 * dpmm / 8; else if (!h) h = w; else if (!w) w = h;
+    return { kind: 'vector', h, w };
+  }
+  const [bh, bw, gap] = base;
+  let mh = h ? Math.max(1, Math.round(h / bh)) : 0, mw = w ? Math.max(1, Math.round(w / bw)) : 0;
+  if (!mh && !mw) mh = mw = 1; else if (!mh) mh = mw; else if (!mw) mw = mh;
+  return { kind: 'mono', h: bh * mh, cw: bw * mw, gap: gap * mw };
+}
+const ZPL_ROT = { N: 0, R: 90, I: 180, B: 270 };
+
+function zplDecodeHex(data, totalBytes, bpr) {
+  const out = new Uint8Array(totalBytes);
+  let row = [], prevRow = null, pos = 0, rep = 0;
+  const flushRow = (fill) => {
+    while (row.length < bpr * 2) row.push(fill || '0');
+    for (let i = 0; i < bpr && pos < totalBytes; i++) out[pos++] = parseInt(row[i * 2] + row[i * 2 + 1], 16) || 0;
+    prevRow = row; row = [];
+  };
+  for (let i = 0; i < data.length && pos < totalBytes; i++) {
+    const ch = data[i];
+    if (ch >= 'G' && ch <= 'Y') { rep += ch.charCodeAt(0) - 70; continue; }
+    if (ch >= 'g' && ch <= 'z') { rep += (ch.charCodeAt(0) - 102) * 20; continue; }
+    if (/[0-9A-Fa-f]/.test(ch)) {
+      const n = rep || 1; rep = 0;
+      for (let k = 0; k < n; k++) { row.push(ch.toUpperCase()); if (row.length === bpr * 2) flushRow(); }
+    } else if (ch === ',') { rep = 0; flushRow('0'); }
+    else if (ch === '!') { rep = 0; flushRow('F'); }
+    else if (ch === ':') { rep = 0; if (prevRow) { row = prevRow.slice(); flushRow(); } else flushRow('0'); }
+  }
+  if (row.length) flushRow('0');
+  return out;
+}
+async function zplDecodeGraphic(data, totalBytes, bpr) {
+  const m = data.match(/^:(B64|Z64):([^:]*)/i);
+  if (m) {
+    const bin = Uint8Array.from(atob(m[2].replace(/\s/g, '')), c => c.charCodeAt(0));
+    if (m[1].toUpperCase() === 'B64') return bin;
+    const ds = new DecompressionStream('deflate');
+    const buf = await new Response(new Blob([bin]).stream().pipeThrough(ds)).arrayBuffer();
+    return new Uint8Array(buf);
+  }
+  return zplDecodeHex(data, totalBytes, bpr);
+}
+
+async function parseZPL(src, cfg, warn) {
+  const s = src.replace(/[\r\n]+/g, '');
+  const labels = []; const graphics = {};
+  const dpmm = cfg.dpmm;
+  let caret = '^', tilde = '~';
+  let st = null, lab = null, f = null;
+
+  const resetState = () => {
+    st = { lh: [0, 0], fw: 'N', cf: zplFont('A', 0, 0, dpmm), cfId: 'A', by: { w: 2, r: 3, h: 10 }, lr: false, pw: null, ll: null, ci: 0, po: false };
+    lab = new Label(cfg.w, cfg.h); f = newField();
+  };
+  const newField = () => ({ x: 0, y: 0, mode: 'bbox', font: null, rot: null, fb: null, tb: null, fr: false, fh: null, bc: null, data: null, gfx: false });
+  const P = str => str.split(',').map(x => x.trim());
+  const rotOf = o => ZPL_ROT[(o || '').toUpperCase()] ?? ZPL_ROT[st.fw] ?? 0;
+
+  const decodeFH = (data, ind) => {
+    const bytes = [];
+    for (let i = 0; i < data.length; i++) {
+      if (data[i] === ind && /^[0-9A-Fa-f]{2}$/.test(data.substr(i + 1, 2))) { bytes.push(parseInt(data.substr(i + 1, 2), 16)); i += 2; }
+      else { const c = data.charCodeAt(i); if (c < 256) bytes.push(c); else bytes.push(...new TextEncoder().encode(data[i])); }
+    }
+    const u = new Uint8Array(bytes);
+    if (st.ci >= 28) return new TextDecoder('utf-8').decode(u);
+    return String.fromCharCode(...u);
+  };
+
+  const pushCanvas = (canvas, anchorY, rot) => {
+    const op = { t: 'canvas', canvas, x: f.x, y: f.y, rot, rev: f.fr || st.lr };
+    if (f.mode === 'bbox') op.mode = 'bbox'; else { op.mode = 'anchor'; op.ax = 0; op.ay = anchorY; }
+    lab.ops.push(op);
+  };
+
+  const endField = () => {
+    if (f.data != null && !f.gfx) {
+      let data = f.data;
+      if (f.fh) data = decodeFH(data, f.fh);
+      if (f.bc) emitBarcode(data);
+      else {
+        const font = f.font || st.cf; const rot = f.rot != null ? f.rot : rotOf(st.fw);
+        let res;
+        if (f.fb) res = makeTextCanvas(data.replace(/\\&/g, '\n'), font, { width: f.fb.w, maxLines: f.fb.lines, spacing: f.fb.sp, justify: f.fb.j });
+        else if (f.tb) res = makeTextCanvas(data, font, { width: f.tb.w, maxLines: Math.max(1, Math.floor(f.tb.h / font.h)), spacing: 0, justify: 'L' });
+        else res = makeTextCanvas(data, font);
+        pushCanvas(res.canvas, res.baseline, rot);
+      }
+    }
+    f = newField();
+  };
+
+  const hrFontZ = () => zplFont('D', 18 * dpmm / 8, 10 * dpmm / 8, dpmm);
+
+  function emitBarcode(data) {
+    const b = f.bc; const rot = b.rot; let spec;
+    const yes = (v, d) => (v == null || v === '') ? d : v.toUpperCase() === 'Y';
+    const hgt = int(b.p.h, st.by.h);
+    const base = { module: st.by.w, ratio: st.by.r, height: hgt, hr: yes(b.p.f, true), hrAbove: yes(b.p.g, false) };
+    try {
+      switch (b.type) {
+        case 'BC': {
+          let txt = data.replace(/></g, '\u0001');
+          const fnc = />8/.test(txt);
+          txt = txt.replace(/>8/g, '^FNC1').replace(/>[0-9:;<=]/g, '').replace(/\u0001/g, '>');
+          if ((b.p.m || '').toUpperCase() === 'U' && !fnc) txt = '^FNC1' + txt;
+          const hrTxt = txt.replace(/\^FNC1/g, '');
+          spec = { ...base, bcid: 'code128', text: txt, opts: { parsefnc: txt.includes('^FNC') }, hrText: hrTxt }; break;
+        }
+        case 'B3': spec = { ...base, bcid: 'code39', text: data.toUpperCase(), opts: { includecheck: yes(b.p.e, false) }, hrText: '*' + data.toUpperCase() + '*' }; break;
+        case 'BL': spec = { ...base, bcid: 'code39', text: data.toUpperCase(), opts: { includecheck: true }, hr: yes(b.p.f, false), hrText: data }; break;
+        case 'BA': spec = { ...base, bcid: 'code93', text: data, hrText: data }; break;
+        case 'BE': { const d = prepEAN(data, 12); spec = { ...base, bcid: 'ean13', text: d, hrText: d }; break; }
+        case 'B8': { const d = prepEAN(data, 7); spec = { ...base, bcid: 'ean8', text: d, hrText: d }; break; }
+        case 'BU': { const d = prepEAN(data, 11); spec = { ...base, bcid: 'upca', text: d, hrText: d }; break; }
+        case 'B9': { const d = data.replace(/\D/g, ''); spec = { ...base, bcid: 'upce', text: d.slice(0, 7), hrText: d.slice(0, 7) }; break; }
+        case 'B2': {
+          let d = data.replace(/\D/g, ''); const chk = yes(b.p.e, false);
+          if ((d.length + (chk ? 1 : 0)) % 2) d = '0' + d;
+          spec = { ...base, bcid: 'interleaved2of5', text: d, opts: { includecheck: chk }, hrText: d }; break;
+        }
+        case 'BK': spec = { ...base, bcid: 'rationalizedCodabar', text: (b.p.k || 'A') + data + (b.p.l || 'A'), hrText: data }; break;
+        case 'B1': spec = { ...base, bcid: 'code11', text: data, hrText: data }; break;
+        case 'BI': spec = { ...base, bcid: 'industrial2of5', text: data, hrText: data }; break;
+        case 'BM': spec = { ...base, bcid: 'msi', text: data, hrText: data }; break;
+        case 'BP': spec = { ...base, bcid: 'plessey', text: data, hrText: data }; break;
+        case 'BZ': spec = { ...base, bcid: 'postnet', text: data, hr: false }; break;
+        case 'BQ': {
+          let d = data, ec = 'Q';
+          const m = d.match(/^([HQML])([AM]),/i);
+          if (m) { ec = m[1].toUpperCase(); d = d.slice(3); if (m[2].toUpperCase() === 'M') d = d.replace(/^(B\d{4}|[NAK])/i, ''); }
+          spec = { bcid: 'qrcode', text: d, module: int(b.p.mag, dpmm >= 12 ? 3 : 2), opts: { eclevel: ec } }; break;
+        }
+        case 'BX': spec = { bcid: 'datamatrix', text: data, module: int(b.p.h, st.by.w * 2) || 4 }; break;
+        case 'BO': spec = { bcid: 'azteccode', text: data, module: int(b.p.mag, 4) || 4 }; break;
+        case 'BD': spec = { bcid: 'maxicode', text: data, module: Math.round(4 * dpmm / 8) }; break;
+        case 'B7': {
+          const o = { rowmult: 1 }; if (b.p.c) o.columns = int(b.p.c, 0) || undefined; if (b.p.r) o.rows = int(b.p.r, 0) || undefined; if (b.p.s) o.eclevel = int(b.p.s, 0);
+          Object.keys(o).forEach(k => o[k] === undefined && delete o[k]);
+          spec = { bcid: 'pdf417', text: data, module: st.by.w, rowHeight: int(b.p.h, 0) || st.by.w * 3, opts: o }; break;
+        }
+        case 'BF': spec = { bcid: 'micropdf417', text: data, module: st.by.w, rowHeight: int(b.p.h, 0) || st.by.w * 2, opts: { rowmult: 1 } }; break;
+        default: warn(`Código de barras ^${b.type} não suportado (desenhado como marcador)`);
+      }
+      if (spec) {
+        const r = makeBarcodeCanvas(spec, hrFontZ());
+        pushCanvas(r.canvas, r.bottom, rot);
+        return;
+      }
+    } catch (e) { warn(`Erro no código de barras ^${b.type} "${data}": ${e.message || e}`); }
+    pushCanvas(errorCanvas(st.by.w * 40, hgt, ''), hgt, rot);
+  }
+
+  function handle(cmd, p) {
+    const a = P(p);
+    switch (cmd) {
+      case '^XA': resetState(); break;
+      case '^XZ':
+        endField();
+        if (cfg.sizeMode === 'file') { if (st.pw) lab.w = st.pw; if (st.ll) lab.h = st.ll; }
+        lab.rot180 = st.po; lab.copies = st.pq || 1; labels.push(lab); lab = null; break;
+      case '^CC': case '~CC': caret = p[0] || '^'; break;
+      case '^CT': case '~CT': tilde = p[0] || '~'; break;
+      case '^LH': st.lh = [int(a[0], 0), int(a[1], 0)]; break;
+      case '^FW': st.fw = (a[0] || 'N').toUpperCase(); break;
+      case '^CF': { st.cfId = a[0] || st.cfId; st.cf = zplFont(st.cfId, num(a[1], 0), num(a[2], 0), dpmm); break; }
+      case '^BY': st.by = { w: int(a[0], st.by.w), r: num(a[1], st.by.r), h: int(a[2], st.by.h) }; break;
+      case '^PW': st.pw = int(a[0], null); break;
+      case '^LL': st.ll = int(a[0], null); break;
+      case '^LR': st.lr = (a[0] || '').toUpperCase() === 'Y'; break;
+      case '^PO': st.po = (a[0] || '').toUpperCase() === 'I'; break;
+      case '^CI': st.ci = int(a[0], 0); break;
+      case '^PQ': st.pq = Math.max(1, int(a[0], 1)); break;
+      case '^FO': case '^FT':
+        f.x = int(a[0], 0) + st.lh[0]; f.y = int(a[1], 0) + st.lh[1];
+        f.mode = cmd === '^FO' ? 'bbox' : 'anchor'; break;
+      case '^A': {
+        const id = p[0] || '0'; const rest = p.slice(1);
+        const q = rest.split(','); const o = (q[0] || '').trim().toUpperCase();
+        f.font = zplFont(id, num(q[1], 0), num(q[2], 0), dpmm);
+        if (!f.font.h) f.font = st.cf;
+        if (o && ZPL_ROT[o] != null) f.rot = ZPL_ROT[o];
+        if (!q[1] && !q[2]) { // sem tamanho: herda do ^CF
+          if (st.cf.kind === 'vector' && f.font.kind === 'vector') f.font = st.cf;
+        }
+        break;
+      }
+      case '^FB': f.fb = { w: int(a[0], 0), lines: int(a[1], 1), sp: int(a[2], 0), j: (a[3] || 'L').toUpperCase() }; break;
+      case '^TB': f.tb = { w: int(a[1], 0), h: int(a[2], 0) }; if (a[0]) f.rot = rotOf(a[0]); break;
+      case '^FR': f.fr = true; break;
+      case '^FH': f.fh = p[0] || '_'; break;
+      case '^FD': case '^FV': case '^SN': f.data = (f.data || '') + p; break;
+      case '^FS': endField(); break;
+      case '^FX': break;
+      case '^GB': {
+        let w = int(a[0], 1), h = int(a[1], 1); const t = int(a[2], 1);
+        w = Math.max(w, t); h = Math.max(h, t);
+        lab.ops.push(boxOp(f.x, f.y, w, h, t, (a[3] || 'B').toUpperCase(), f.fr || st.lr, int(a[4], 0)));
+        f.gfx = true; break;
+      }
+      case '^GC': { const d = int(a[0], 3), t = int(a[1], 1); lab.ops.push(ellipseOp(f.x, f.y, d, d, t, (a[2] || 'B').toUpperCase(), f.fr || st.lr)); f.gfx = true; break; }
+      case '^GE': { const w = int(a[0], 3), h = int(a[1], 3), t = int(a[2], 1); lab.ops.push(ellipseOp(f.x, f.y, w, h, t, (a[3] || 'B').toUpperCase(), f.fr || st.lr)); f.gfx = true; break; }
+      case '^GD': { const t = int(a[2], 1); const w = Math.max(int(a[0], t), t), h = Math.max(int(a[1], t), t); lab.ops.push(diagOp(f.x, f.y, w, h, t, (a[3] || 'B').toUpperCase(), f.fr || st.lr, (a[4] || 'R').toUpperCase())); f.gfx = true; break; }
+      case '^GF': {
+        // ^GFa,b,c,d,data
+        const m = p.match(/^([^,]*),([^,]*),([^,]*),([^,]*),(.*)$/s);
+        if (!m) break;
+        const fmt = (m[1] || 'A').toUpperCase(), total = int(m[3], 0) || int(m[2], 0), bpr = int(m[4], 1);
+        if (fmt !== 'A') { warn('^GF em formato binário/compactado (B/C) não suportado'); break; }
+        const op = { t: 'canvas', canvas: null, x: f.x, y: f.y, rot: 0, mode: 'bbox', rev: f.fr || st.lr, pending: zplDecodeGraphic(m[5], total, bpr).then(bytes => { op.canvas = bitmapCanvas(bytes, bpr, Math.ceil(total / bpr)); }) };
+        lab.ops.push(op); f.gfx = true; break;
+      }
+      case '~DG': {
+        const m = p.match(/^([^,]*),([^,]*),([^,]*),(.*)$/s); if (!m) break;
+        const name = m[1].replace(/^[A-Z]:/i, '').replace(/\.GRF$/i, '').toUpperCase();
+        const total = int(m[2], 0), bpr = int(m[3], 1);
+        graphics[name] = { bpr, rows: Math.ceil(total / bpr), promise: zplDecodeGraphic(m[4], total, bpr) };
+        break;
+      }
+      case '^XG': case '^IM': {
+        const name = (a[0] || '').replace(/^[A-Z]:/i, '').replace(/\.GRF$/i, '').toUpperCase();
+        const g = graphics[name]; if (!g) { warn(`Imagem ${name} não encontrada (use ~DG antes)`); break; }
+        const mx = cmd === '^XG' ? int(a[1], 1) : 1, my = cmd === '^XG' ? int(a[2], 1) : 1;
+        const op = { t: 'canvas', canvas: null, x: f.x, y: f.y, rot: 0, mode: 'bbox', rev: f.fr || st.lr, pending: g.promise.then(bytes => { op.canvas = bitmapCanvas(bytes, g.bpr, g.rows, true, mx, my); }) };
+        lab.ops.push(op); f.gfx = true; break;
+      }
+      default: {
+        const bc = cmd.match(/^\^B([0-9A-Z])$/);
+        if (bc) {
+          const t = 'B' + bc[1];
+          const o = (a[0] || '').toUpperCase();
+          const names = {
+            BC: ['o', 'h', 'f', 'g', 'e', 'm'], B3: ['o', 'e', 'h', 'f', 'g'], BL: ['o', 'h', 'f'], BA: ['o', 'h', 'f', 'g', 'e'],
+            BE: ['o', 'h', 'f', 'g'], B8: ['o', 'h', 'f', 'g'], BU: ['o', 'h', 'f', 'g', 'e'], B9: ['o', 'h', 'f', 'g', 'e'],
+            B2: ['o', 'h', 'f', 'g', 'e'], BK: ['o', 'e', 'h', 'f', 'g', 'k', 'l'], B1: ['o', 'e', 'h', 'f', 'g'], BI: ['o', 'h', 'f', 'g'],
+            BM: ['o', 'e', 'h', 'f', 'g'], BP: ['o', 'e', 'h', 'f', 'g'], BZ: ['o', 'h', 'f', 'g'],
+            BQ: ['o', 'model', 'mag', 'ec', 'mask'], BX: ['o', 'h', 's', 'c', 'r'], BO: ['o', 'mag'], BD: ['mode', 'n', 't'],
+            B7: ['o', 'h', 's', 'c', 'r', 't'], BF: ['o', 'h', 'm']
+          }[t] || ['o', 'h', 'f', 'g'];
+          const params = {}; names.forEach((n, i) => params[n] = a[i]);
+          f.bc = { type: t, rot: rotOf(t === 'BD' ? 'N' : o), p: params };
+          break;
+        }
+        const ignore = /^(\^(MM|MN|MT|MD|PR|LS|PM|JM|JUS|JU|SZ|ML|MF|MU|LT|PF|JZ|CW|FN|DF|XF|IS|IL|ID|FP|FC|SF|SL|SO|SQ|SR|SS|SX|HH|HW|HG|HT|WD|KL|KN|KP|JS|JT|JB|JC|JW|JJ|NC|NI|NS|SC|SE|ST|FL|FM|PA|PH|PP|PS|PN|MP|MW|NN)|~(JA|JC|JD|JE|JG|JL|JN|JO|JP|JR|JS|SD|TA|PS|PL|HS|HM|HI|HD|HQ|RO|WC|DB|DE|DN|DS|DT|DU|DY|EG|KB|NC|NT|PH|PR|WR|JB|JF|JI|JQ|JX|RO))/;
+        if (!ignore.test(cmd)) warn(`Comando ${cmd} ignorado`);
+      }
+    }
+  }
+
+  let i = 0;
+  resetState(); lab = null;
+  while (i < s.length) {
+    const ch = s[i];
+    if (ch === caret || ch === tilde) {
+      const pre = ch === caret ? '^' : '~';
+      let cmd = s.substr(i + 1, 2).toUpperCase(); let ps = i + 3;
+      if (pre === '^' && cmd[0] === 'A' && cmd !== 'A@') { cmd = 'A'; ps = i + 2; }
+      else if (pre === '^' && cmd === 'A@') { cmd = 'A'; ps = i + 2; }
+      let end;
+      if (pre === '^' && (cmd === 'FD' || cmd === 'FV' || cmd === 'FX' || cmd === 'SN')) { end = s.indexOf(caret, ps); }
+      else {
+        const e1 = s.indexOf(caret, ps), e2 = s.indexOf(tilde, ps);
+        end = e1 < 0 ? e2 : (e2 < 0 ? e1 : Math.min(e1, e2));
+      }
+      if (end < 0) end = s.length;
+      const params = s.slice(ps, end);
+      const full = pre + cmd;
+      if (!lab && full !== '^XA' && !full.startsWith('~') && full !== '^CC' && full !== '^CT') { /* fora de ^XA..^XZ */ }
+      else if (lab || full === '^XA' || full.startsWith('~')) handle(full === '^A' ? '^A' : full, params);
+      i = end;
+    } else i++;
+  }
+  if (lab && lab.ops.length) { endField(); if (cfg.sizeMode === 'file') { if (st.pw) lab.w = st.pw; if (st.ll) lab.h = st.ll; } labels.push(lab); warn('^XZ final ausente'); }
+  for (const l of labels) for (const op of l.ops) if (op.pending) { try { await op.pending; } catch (e) { warn('Falha ao decodificar imagem: ' + e.message); } }
+  for (const l of labels) l.ops = l.ops.filter(op => op.t !== 'canvas' || op.canvas);
+  return labels;
+}
+
+/* ===================================================================
+   EPL2
+   =================================================================== */
+function eplFont(id, hm, vm, dpi) {
+  const t203 = { 1: [12, 8], 2: [16, 10], 3: [20, 12], 4: [24, 14], 5: [48, 32] };
+  const t300 = { 1: [20, 12], 2: [28, 16], 3: [36, 20], 4: [44, 24], 5: [80, 48] };
+  const tbl = dpi >= 300 ? t300 : t203;
+  let [h, w] = tbl[id] || tbl[3];
+  if (dpi < 200) { h = Math.round(h * 0.75); w = Math.round(w * 0.75); }
+  if (dpi >= 600) { h *= 2; w *= 2; }
+  hm = Math.max(1, hm || 1); vm = Math.max(1, vm || 1);
+  const cw = w * hm, gap = Math.max(1, Math.round(cw * 0.18));
+  return { kind: 'mono', h: h * vm, cw: cw - gap, gap };
+}
+function splitArgs(str) {
+  const out = []; let cur = '', q = false, wasQ = false;
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (q) {
+      if (c === '\\' && i + 1 < str.length) { cur += str[++i]; continue; }
+      if (c === '"') { q = false; continue; }
+      cur += c;
+    } else if (c === '"') { q = true; wasQ = true; cur = cur.trim(); }
+    else if (c === ',') { out.push(wasQ ? cur : cur.trim()); cur = ''; wasQ = false; }
+    else if (!wasQ) cur += c;
+  }
+  out.push(q || wasQ ? cur : cur.trim());
+  return out;
+}
+const EPL_ROT = { 0: 0, 1: 90, 2: 180, 3: 270 };
+const EPL_BC = {
+  '0': 'code128', '1': 'code128', '1A': 'code128', '1B': 'code128', '1C': 'code128', '1E': 'gs1-128',
+  '3': 'code39', '3C': 'code39', '9': 'code93', '2': 'interleaved2of5', '2C': 'interleaved2of5', '2D': 'interleaved2of5',
+  'K': 'rationalizedCodabar', 'E30': 'ean13', 'E32': 'ean13', 'E35': 'ean13', 'E80': 'ean8', 'E82': 'ean8', 'E85': 'ean8',
+  'UA0': 'upca', 'UA2': 'upca', 'UA5': 'upca', 'UE0': 'upce', 'UE2': 'upce', 'UE5': 'upce', 'P': 'postnet', 'L': 'plessey', 'M': 'msi', 'R': 'gs1-128'
+};
+
+async function parseEPL(src, cfg, warn) {
+  const labels = []; const dpi = cfg.dpi;
+  let W = null, H = null, ref = [0, 0], zb = false;
+  let lab = new Label(cfg.w, cfg.h), dirty = false;
+  let copies = 1;
+  const finish = () => {
+    if (cfg.sizeMode === 'file') { if (W) lab.w = W; if (H) lab.h = H; }
+    lab.rot180 = zb; lab.copies = copies; labels.push(lab); lab = new Label(cfg.w, cfg.h); dirty = false;
+  };
+  const hrFont = () => eplFont(dpi >= 300 ? 2 : 2, 1, 1, dpi);
+  let i = 0;
+  while (i < src.length) {
+    let nl = src.indexOf('\n', i); if (nl < 0) nl = src.length;
+    let line = src.slice(i, nl).replace(/\r$/, '');
+    let next = nl + 1;
+    const lt = line.replace(/^[\s\x00-\x1f]+/, '');
+    if (!lt || lt[0] === ';') { i = next; continue; }
+    const two = lt.slice(0, 2), one = lt[0];
+    const body = (n) => lt.slice(n);
+    if (two === 'GW') {
+      const m = lt.match(/^GW(\d+),(\d+),(\d+),(\d+),/);
+      if (m) {
+        const x = +m[1], y = +m[2], bpr = +m[3], rows = +m[4];
+        const start = i + (line.length - lt.length) + m[0].length;
+        const n = bpr * rows; const bytes = new Uint8Array(n);
+        for (let k = 0; k < n; k++) bytes[k] = src.charCodeAt(start + k) & 255;
+        lab.ops.push({ t: 'canvas', canvas: bitmapCanvas(bytes, bpr, rows, false), x: x + ref[0], y: y + ref[1], rot: 0, mode: 'bbox' });
+        dirty = true;
+        next = start + n; const after = src.indexOf('\n', next); if (after >= 0 && src.slice(next, after).trim() === '') next = after + 1;
+      }
+      i = next; continue;
+    }
+    if (two === 'LO' || two === 'LW' || two === 'LE') {
+      const a = body(2).split(',').map(v => int(v, 0));
+      lab.ops.push(boxOp(a[0] + ref[0], a[1] + ref[1], a[2], a[3], Math.max(a[2], a[3]), two === 'LW' ? 'W' : 'B', two === 'LE'));
+      dirty = true;
+    } else if (two === 'LS') {
+      const a = body(2).split(',').map(v => int(v, 0));
+      lab.ops.push(lineOp(a[0] + ref[0], a[1] + ref[1], a[3] + ref[0], a[4] + ref[1], a[2] || 1, 'B', false)); dirty = true;
+    } else if (two === 'ZB') zb = true;
+    else if (two === 'ZT') zb = false;
+    else if (/^(JF|JB|OD|ON|OE|EI|EK|ES|FK|FR|FS|FE|FI|UN|US|UP|UQ|UI|UB|UF|UE|UM|UA|UG|GK|GI|GM|GG|TT|TS|TD|xa|AE|oH|oB|oE|oL|oM|oR|oW|oY)/.test(two)) {
+      if (two === 'GG') warn('GG (imagem armazenada) não suportado');
+    } else if (one === 'N' && /^N\s*$/.test(lt)) { lab = new Label(cfg.w, cfg.h); dirty = false; }
+    else if (one === 'q') W = int(body(1), W);
+    else if (one === 'Q') { const a = body(1).split(','); const h = int(a[0], 0); if (h > 0) H = h; }
+    else if (one === 'R' && /^R\d/.test(lt)) { const a = body(1).split(','); ref = [int(a[0], 0), int(a[1], 0)]; }
+    else if (one === 'P' && /^P\d*(,\d+)?\s*$/.test(lt)) { copies = Math.max(1, int(lt.slice(1), 1)); finish(); }
+    else if (one === 'A' && /^A\d/.test(lt)) {
+      const a = splitArgs(body(1));
+      const font = eplFont(int(a[3], 3), int(a[4], 1), int(a[5], 1), dpi);
+      const r = makeTextCanvas(a.slice(7).join(','), font);
+      const isRev = (a[6] || 'N').toUpperCase() === 'R';
+      if (isRev) { const c2 = newCanvas(r.canvas.width, r.canvas.height); const x2 = c2.getContext('2d'); x2.fillRect(0, 0, c2.width, c2.height); x2.globalCompositeOperation = 'destination-out'; x2.drawImage(r.canvas, 0, 0); r.canvas = c2; }
+      lab.ops.push({ t: 'canvas', canvas: r.canvas, x: int(a[0], 0) + ref[0], y: int(a[1], 0) + ref[1], rot: EPL_ROT[int(a[2], 0)] || 0, mode: 'anchor', ax: 0, ay: 0 });
+      dirty = true;
+    } else if (one === 'B' && /^B\d/.test(lt)) {
+      const a = splitArgs(body(1));
+      const type = (a[3] || '1').toUpperCase(); const bcid = EPL_BC[type]; const data = a.slice(8).join(',');
+      const narrow = int(a[4], 2), wide = int(a[5], narrow * 3), h = int(a[6], 50), hr = (a[7] || 'N').toUpperCase() === 'B';
+      const x = int(a[0], 0) + ref[0], y = int(a[1], 0) + ref[1], rot = EPL_ROT[int(a[2], 0)] || 0;
+      let canvas;
+      try {
+        if (!bcid) throw new Error('tipo ' + type + ' não suportado');
+        let text = data, hrText = data, opts = {};
+        if (bcid === 'ean13') text = hrText = prepEAN(data, 12);
+        if (bcid === 'ean8') text = hrText = prepEAN(data, 7);
+        if (bcid === 'upca') text = hrText = prepEAN(data, 11);
+        if (bcid === 'code39') { text = data.toUpperCase(); hrText = '*' + text + '*'; opts.includecheck = type === '3C'; }
+        if (bcid === 'interleaved2of5') { text = data.replace(/\D/g, ''); opts.includecheck = type !== '2'; if ((text.length + (opts.includecheck ? 1 : 0)) % 2) text = '0' + text; }
+        if (bcid === 'rationalizedCodabar' && !/^[A-D]/i.test(text)) text = 'A' + text + 'A';
+        if (bcid === 'gs1-128') { opts = {}; if (!/^\(/.test(text)) { text = '^FNC1' + text; opts.parsefnc = true; } }
+        const spec = { bcid: bcid === 'gs1-128' && !/^\(/.test(data) ? 'code128' : bcid, text, opts, module: narrow, ratio: wide / narrow, height: h, hr, hrText: hrText.replace(/\^FNC1/g, '') };
+        canvas = makeBarcodeCanvas(spec, hrFont()).canvas;
+      } catch (e) { warn(`Erro no código de barras EPL tipo ${type} "${data}": ${e.message || e}`); canvas = errorCanvas(narrow * 60, h, ''); }
+      lab.ops.push({ t: 'canvas', canvas, x, y, rot, mode: 'anchor', ax: 0, ay: 0 });
+      dirty = true;
+    } else if (one === 'b' && /^b\d/.test(lt)) {
+      const a = splitArgs(body(1));
+      const x = int(a[0], 0) + ref[0], y = int(a[1], 0) + ref[1], kind = (a[2] || 'Q').toUpperCase();
+      const data = a[a.length - 1]; const optsRaw = a.slice(3, -1);
+      let spec;
+      if (kind === 'Q') {
+        let s = 3, ec = 'M'; optsRaw.forEach(o => { if (/^s\d+/i.test(o)) s = int(o.slice(1), 3); if (/^e[LMQH]/i.test(o)) ec = o[1].toUpperCase(); });
+        spec = { bcid: 'qrcode', text: data, module: s, opts: { eclevel: ec } };
+      } else if (kind === 'D') { let s = 4; optsRaw.forEach(o => { if (/^h\d+/i.test(o)) s = int(o.slice(1), 4); }); spec = { bcid: 'datamatrix', text: data, module: s }; }
+      else if (kind === 'A') { let s = 4; optsRaw.forEach(o => { if (/^m\d+/i.test(o)) s = int(o.slice(1), 4); }); spec = { bcid: 'azteccode', text: data, module: s }; }
+      else if (kind === 'P') {
+        // b x,y,P,width,height,... (simplificado)
+        spec = { bcid: 'pdf417', text: data, module: 2, rowHeight: 6, opts: { rowmult: 1 } };
+      } else if (kind === 'M') spec = { bcid: 'maxicode', text: data, module: 4 };
+      try { if (!spec) throw new Error('tipo ' + kind); const r = makeBarcodeCanvas(spec); lab.ops.push({ t: 'canvas', canvas: r.canvas, x, y, rot: 0, mode: 'bbox' }); }
+      catch (e) { warn(`Erro no 2D EPL "${kind}": ${e.message || e}`); lab.ops.push({ t: 'canvas', canvas: errorCanvas(80, 80), x, y, rot: 0, mode: 'bbox' }); }
+      dirty = true;
+    } else if (one === 'X' && /^X\d/.test(lt)) {
+      const a = body(1).split(',').map(v => int(v, 0));
+      const x1 = Math.min(a[0], a[3]), y1 = Math.min(a[1], a[4]), x2 = Math.max(a[0], a[3]), y2 = Math.max(a[1], a[4]);
+      lab.ops.push(boxOp(x1 + ref[0], y1 + ref[1], x2 - x1, y2 - y1, a[2] || 1, 'B', false)); dirty = true;
+    } else if (/^[SDIOUVCMYW?^]/.test(one) || /^(FK|FS|FR)/.test(two)) {
+      if (one === 'V' || one === 'C') warn(`Variável/contador "${lt.slice(0, 20)}" mostrado como texto literal`);
+    } else warn(`Linha EPL não reconhecida: ${lt.slice(0, 40)}`);
+    i = next;
+  }
+  if (dirty) { copies = 1; finish(); }
+  return labels;
+}
+
+/* ===================================================================
+   PPLA (Argox) — formato "DPL-like"
+   =================================================================== */
+function pplaFont(id, cm, dm, dpi) {
+  const t = { 0: [8, 5], 1: [13, 7], 2: [18, 10], 3: [27, 14], 4: [36, 18], 5: [52, 28], 6: [64, 32], 7: [32, 15], 8: [28, 15] };
+  let [h, w] = t[id] || t[2];
+  const k = dpi / 203; h = Math.round(h * k); w = Math.round(w * k);
+  const cw = w * Math.max(1, cm), gap = Math.max(1, Math.round(cw * 0.15));
+  return { kind: 'mono', h: h * Math.max(1, dm), cw: cw - gap, gap };
+}
+const PPLA_BC = {
+  A: 'code39', B: 'upca', C: 'upce', D: 'interleaved2of5', E: 'code128', F: 'ean13', G: 'ean8', H: 'code39',
+  I: 'rationalizedCodabar', J: 'interleaved2of5', K: 'plessey', L: 'interleaved2of5', O: 'code93', P: 'postnet',
+  Q: 'gs1-128', R: 'gs1-128', S: 'gs1-128', T: 'telepen', Z: 'msi'
+};
+const PPLA_ROT = { 1: 0, 2: 90, 3: 180, 4: 270 };
+
+async function parsePPLA(src, cfg, warn) {
+  const s = src.replace(/<STX>/gi, '\x02').replace(/<SOH>/gi, '\x01').replace(/<CR>/gi, '\n').replace(/<LF>/gi, '');
+  const lines = s.split(/\r\n|\r|\n/);
+  const dpi = cfg.dpi; const labels = [];
+  let metric = false, inFmt = false, lab = null, contLen = null, colOff = 0, rowOff = 0, any = false;
+  const U = v => metric ? v * dpi / 254 : v * dpi / 100; // unidades -> pontos
+  const start = () => { lab = new Label(cfg.w, cfg.h); inFmt = true; colOff = 0; rowOff = 0; };
+  const end = () => { if (lab) { if (cfg.sizeMode === 'file' && contLen) lab.h = Math.round(U(contLen)); labels.push(lab); } lab = null; inFmt = false; };
+  const REC = /^([1-4])([0-9A-Za-z])([0-9A-Za-z])([0-9A-Za-z])([0-9A-Za-z]{3})(\d{3,4})(\d{4})(.*)$/;
+  const REC2D = /^([1-4])W1([A-Za-z])([0-9A-Za-z])([0-9A-Za-z])([0-9A-Za-z]{3})(\d{4})(\d{4})(.*)$/;
+  const fromBottom = cfg.pplaOrigin !== 'top';
+
+  for (let raw of lines) {
+    const hadSTX = /^[\x01\x02]/.test(raw);
+    let ln = raw.replace(/^[\x00-\x1f]+/, '');
+    if (!ln) continue;
+    if (hadSTX) {
+      const c = ln[0];
+      if (c === 'L') { start(); ln = ln.slice(1); if (!ln) continue; }
+      else if (c === 'm') { metric = true; continue; }
+      else if (c === 'n') { metric = false; continue; }
+      else if (c === 'c' && /^c\d{4}/.test(ln)) { contLen = int(ln.slice(1, 5), null); continue; }
+      else if (c === 'I') { warn('Download de imagem (<STX>I) não suportado'); continue; }
+      else continue; // demais comandos de sistema (f, e, O, K, V, M, S…)
+    }
+    if (!inFmt && !hadSTX) {
+      if (ln === 'L') { start(); continue; }
+      if (ln === 'm') { metric = true; continue; }
+      if (ln === 'n') { metric = false; continue; }
+      if (/^c\d{4}$/.test(ln)) { contLen = int(ln.slice(1, 5), null); continue; }
+    }
+    if (inFmt && /^f\d+$/.test(ln)) continue; // posição de parada (stop position)
+    if (!inFmt) {
+      if (REC.test(ln)) start(); else continue;
+    }
+    // comandos do formato
+    if (/^E(\d{0,4})$/.test(ln)) { end(); continue; }
+    if (/^D\d\d$/.test(ln) || /^H\d\d$/.test(ln) || /^P[0-9A-Za-z]$/.test(ln) || /^S[0-9A-Za-z]$/.test(ln) || /^A\d$/.test(ln) || /^z$/.test(ln) || /^\^\d\d$/.test(ln) || /^[TyUG]/.test(ln) && !REC.test(ln)) continue;
+    if (/^Q\d+$/.test(ln)) { lab.copies = Math.max(1, int(ln.slice(1), 1)); continue; }
+    if (ln === 'm') { metric = true; continue; }
+    if (ln === 'n') { metric = false; continue; }
+    if (/^C\d{4}$/.test(ln)) { colOff = int(ln.slice(1), 0); continue; }
+    if (/^R\d{4}$/.test(ln)) { rowOff = int(ln.slice(1), 0); continue; }
+
+    let m2 = ln.match(REC2D), m = m2 ? null : ln.match(REC);
+    if (!m && !m2) { warn(`Linha PPLA não reconhecida: ${ln.slice(0, 40)}`); continue; }
+    any = true;
+    const H = lab.h;
+    if (m2) {
+      const [, r, type, c, d, , row, col, dataRaw] = m2;
+      const x = U(+col + colOff), yPt = U(+row + rowOff);
+      let data = dataRaw, spec, mod = Math.max(1, parseInt(c, 36) || 4);
+      const t = type.toUpperCase();
+      if (t === 'D' || t === 'Q') {
+        let ec = 'M'; const mm = data.match(/^([HQML])([AM])?,/i) || data.match(/^\d?([HQML])([AM])?,/i);
+        if (mm) { ec = mm[1].toUpperCase(); data = data.slice(mm[0].length); }
+        spec = { bcid: 'qrcode', text: data, module: mod, opts: { eclevel: ec } };
+      } else if (t === 'C') spec = { bcid: 'datamatrix', text: data, module: mod };
+      else if (t === 'Z') spec = { bcid: 'pdf417', text: data, module: mod, rowHeight: mod * 3, opts: { rowmult: 1 } };
+      else if (t === 'U') spec = { bcid: 'maxicode', text: data, module: mod };
+      try {
+        if (!spec) throw new Error('tipo W1' + type);
+        const res = makeBarcodeCanvas(spec);
+        const y = fromBottom ? H - yPt : yPt;
+        lab.ops.push({ t: 'canvas', canvas: res.canvas, x, y, rot: PPLA_ROT[r], mode: 'anchor', ax: 0, ay: fromBottom ? res.canvas.height : 0 });
+      } catch (e) { warn(`Erro 2D PPLA: ${e.message || e}`); }
+      continue;
+    }
+    const [, r, b, c, d, eee, row, col, data] = m;
+    const x = U(+col + colOff), yPt = U(+row + rowOff);
+    const rot = PPLA_ROT[r] || 0;
+    const y = fromBottom ? H - yPt : yPt;
+    const anchorBottom = (cv) => fromBottom ? cv.height : 0;
+    if (b === 'X') { // linhas e caixas
+      // Linha: L/l + largura + altura (3 ou 4 dígitos cada)
+      // Caixa: B/b + largura + altura + grossura linhas horizontais + grossura linhas verticais
+      const gd = data.replace(/\s+/g, '');
+      const mm = gd.match(/^([lbsLBS])(\d{3,4})(\d{3,4})(\d{3,4})?(\d{3,4})?/);
+      if (!mm) { warn('Gráfico PPLA não reconhecido: ' + ln); continue; }
+      const kind = mm[1].toLowerCase();
+      const dg = (gd.slice(1).match(/^\d+/) || [''])[0];
+      const split = (lens) => { let o = 0; return lens.map(n => { const v = int(dg.slice(o, o + n), 0); o += n; return v; }); };
+      if (kind === 'b') {
+        const lens = dg.length >= 16 ? [4, 4, 4, 4] : dg.length >= 14 ? [4, 4, 3, 3] : dg.length >= 12 ? [3, 3, 3, 3] : [4, 4, 3, 3];
+        const [bw, bh, btb, bts] = split(lens);
+        const w = U(bw), h = U(bh), tb = Math.max(1, Math.round(U(btb))), ts = Math.max(1, Math.round(U(bts)));
+        const top = fromBottom ? y - h : y;
+        lab.ops.push(boxOp(x, top, w, h, ts, 'B', false, 0, tb));
+      } else {
+        const [lw, lh] = split(dg.length >= 8 ? [4, 4] : [3, 3]);
+        const w = U(lw), h = U(lh);
+        const top = fromBottom ? y - h : y;
+        lab.ops.push(boxOp(x, top, Math.max(1, w), Math.max(1, h), 9999, 'B', false));
+      }
+      continue;
+    }
+    if (b === 'Y') { warn('Imagem armazenada (Y) não suportada'); continue; }
+    if (/[0-9]/.test(b)) { // texto
+      let font;
+      if (b === '9') {
+        let pts = 10; const mm = eee.match(/^[A-Za-z]?(\d{2,3})$/); if (mm) pts = int(mm[1], 10);
+        if (pts < 4) pts = 10;
+        const hpx = pts * dpi / 72;
+        font = { kind: 'vector', h: hpx, w: hpx * Math.max(1, parseInt(c, 36) || 1) / Math.max(1, parseInt(d, 36) || 1) };
+      } else font = pplaFont(+b, parseInt(c, 36) || 1, parseInt(d, 36) || 1, dpi);
+      const res = makeTextCanvas(data, font);
+      lab.ops.push({ t: 'canvas', canvas: res.canvas, x, y, rot, mode: 'anchor', ax: 0, ay: anchorBottom(res.canvas) });
+      continue;
+    }
+    // código de barras
+    const hr = b === b.toUpperCase();
+    const bcid = PPLA_BC[b.toUpperCase()];
+    const wide = Math.max(1, parseInt(c, 36) || 3), narrow = Math.max(1, parseInt(d, 36) || 1);
+    const hgt = Math.max(1, Math.round(U(int(eee, 50))));
+    let canvas;
+    try {
+      if (!bcid) throw new Error('tipo ' + b + ' não suportado');
+      let text = data, hrText = data, opts = {}, id = bcid;
+      if (bcid === 'ean13') text = hrText = prepEAN(data, 12);
+      if (bcid === 'ean8') text = hrText = prepEAN(data, 7);
+      if (bcid === 'upca') text = hrText = prepEAN(data, 11);
+      if (bcid === 'code39') { text = data.toUpperCase(); hrText = '*' + text + '*'; }
+      if (bcid === 'interleaved2of5') { text = data.replace(/\D/g, ''); opts.includecheck = b.toUpperCase() === 'J'; if ((text.length + (opts.includecheck ? 1 : 0)) % 2) text = '0' + text; }
+      if (bcid === 'rationalizedCodabar' && !/^[A-D]/i.test(text)) text = 'A' + text + 'A';
+      if (bcid === 'gs1-128') { id = 'code128'; text = '^FNC1' + data; opts.parsefnc = true; }
+      const isModule = !RATIO_TYPES.has(id);
+      const spec = { bcid: id, text, opts, module: narrow, ratio: wide / narrow, height: hgt, hr, hrText };
+      if (isModule) spec.module = narrow;
+      canvas = makeBarcodeCanvas(spec, pplaFont(1, 1, 1, dpi)).canvas;
+    } catch (e) { warn(`Erro no código de barras PPLA tipo ${b} "${data}": ${e.message || e}`); canvas = errorCanvas(narrow * 60, hgt, ''); }
+    lab.ops.push({ t: 'canvas', canvas, x, y, rot, mode: 'anchor', ax: 0, ay: anchorBottom(canvas) });
+  }
+  if (lab && lab.ops.length) { end(); warn('Comando E (fim de etiqueta) ausente'); }
+  // Como a Argox imprime: linhas/caixas primeiro; texto e códigos por cima em modo
+  // "overlap" (XOR) — preto sobre fundo branco, branco sobre área preta.
+  for (const l of labels) {
+    const shapes = l.ops.filter(o => o.t === 'shape');
+    const fields = l.ops.filter(o => o.t !== 'shape').map(o => Object.assign(o, { rev: true }));
+    l.ops = shapes.concat(fields);
+  }
+  // Sem tamanho no arquivo: se o conteúdo passar da etiqueta informada, aumenta a área visível.
+  if (cfg.sizeMode === 'file' && !contLen) {
+    const margin = Math.round(dpi / 25.4);
+    for (const l of labels) {
+      let minY = 0, maxX = l.w, minX = 0;
+      for (const o of l.ops) {
+        let bx, by, bw, bh;
+        if (o.bb) [bx, by, bw, bh] = o.bb;
+        else if (o.canvas) {
+          const rot = ((o.rot || 0) % 360 + 360) % 360; const rw = rot % 180 ? o.canvas.height : o.canvas.width, rh = rot % 180 ? o.canvas.width : o.canvas.height;
+          if (o.mode === 'anchor') {
+            const a = rot * Math.PI / 180, cs = Math.round(Math.cos(a)), sn = Math.round(Math.sin(a));
+            const pts = [[0, 0], [o.canvas.width, 0], [0, o.canvas.height], [o.canvas.width, o.canvas.height]].map(([px, py]) => {
+              const u = px - (o.ax || 0), v = py - (o.ay || 0); return [o.x + u * cs - v * sn, o.y + u * sn + v * cs]; });
+            bx = Math.min(...pts.map(q => q[0])); by = Math.min(...pts.map(q => q[1]));
+            bw = Math.max(...pts.map(q => q[0])) - bx; bh = Math.max(...pts.map(q => q[1])) - by;
+            minY = Math.min(minY, by); maxX = Math.max(maxX, bx + bw); minX = Math.min(minX, bx); continue;
+          }
+          bw = rw; bh = rh; bx = o.x; by = o.mode === 'bboxbl' ? o.y - bh : o.y;
+        } else continue;
+        minY = Math.min(minY, by); maxX = Math.max(maxX, bx + bw);
+      }
+      if (minY < 0) { l.offY = Math.ceil(-minY) + margin; l.h += l.offY; warn(`Conteúdo maior que a altura informada: área ampliada para ${(l.h / dpi * 25.4).toFixed(0)} mm (o arquivo não informa a altura da etiqueta)`); }
+      if (maxX > l.w) { l.w = Math.ceil(maxX) + margin; warn(`Conteúdo maior que a largura informada: área ampliada para ${(l.w / dpi * 25.4).toFixed(0)} mm`); }
+    }
+  }
+  return labels;
+}
+
+/* ===================================================================
+   Detecção de linguagem
+   =================================================================== */
+function detectLang(src) {
+  if (/\^XA/i.test(src) || /~DG/i.test(src)) return 'zpl';
+  let ppla = 0, epl = 0;
+  if (/\x02L|<STX>L/i.test(src)) ppla += 5;
+  for (const raw of src.split(/\r?\n/).slice(0, 400)) {
+    const l = raw.replace(/^[\x00-\x1f\s]+/, '');
+    if (/^[1-4][0-9A-Za-z]{4}\d{3}\d{4}\d{4}/.test(l) || /^[1-4]W1/.test(l)) ppla++;
+    if (/^(A|B)\d+,\d+,[0-3],/.test(l) || /^(LO|LE|LW|X)\d+,\d+,/.test(l) || /^q\d+/.test(l) || /^Q\d+,/.test(l) || /^N$/.test(l) || /^P\d+/.test(l) || /^b\d+,\d+,/.test(l)) epl++;
+  }
+  if (ppla === 0 && epl === 0) return /\^[A-Z]{2}/.test(src) ? 'zpl' : 'epl';
+  return ppla > epl ? 'ppla' : 'epl';
+}
+
+/* ===================================================================
+   UI
+   =================================================================== */
+const EXAMPLES = {
+zpl: `^XA
+^CI28
+^PW799
+^LL400
+^FX ---- Cabeçalho ----
+^FO20,20^GB760,70,70^FS
+^FO40,35^A0N,45,45^FR^FDEXPEDIÇÃO  LOJA 042^FS
+^FO20,105^GB760,280,3,B,1^FS
+^FO40,125^A0N,30,30^FDProduto:^FS
+^FO170,125^A0N,30,30^FDCamiseta algodão azul M^FS
+^FO40,165^ADN,18,10^FDLote 2026-11 / Validade 11/2027^FS
+^BY2,3,80
+^FO40,205^BCN,80,Y,N,N^FD7891234567895^FS
+^FO560,130^BQN,2,5^FDQA,https://exemplo.com.br/p/42^FS
+^FO520,300^GE120,60,3^FS
+^FO545,318^A0N,28,28^FDR$ 49^FS
+^XZ`,
+epl: `N
+q799
+Q400,24
+R0,0
+LO20,20,760,4
+A40,40,0,4,1,1,N,"ELGIN / ZEBRA EPL2"
+A40,90,0,3,1,1,N,"Produto: Caneca de porcelana 350ml"
+A40,125,0,2,1,1,R," PROMOCAO "
+B40,170,0,1,2,6,90,B,"CX-000123"
+B420,170,0,E30,3,0,90,B,"789123456789"
+X20,10,3,780,390
+b620,30,Q,s4,eM,"https://exemplo.com.br"
+P1`,
+ppla: `\x02L
+m
+D11
+H14
+PC
+141100004300040ARGOX PPLA - TESTE
+121100003700040Produto: Arroz tipo 1 5kg
+1E3212000800040ABC-12345
+1F3210000800500789123456789
+1W1D44000005008001MA,https://exemplo.com.br
+1X1100000100010b0980048000050005
+1X1100003300010l09800003
+Q0002
+E`
+};
+
+let lastSrcRaw = '';
+const state = { timer: null };
+
+function cfgFromUI() {
+  const dpi = +$('dpi').value; const dpmm = { 152: 6, 203: 8, 300: 12, 600: 24 }[dpi];
+  return {
+    dpi, dpmm,
+    w: Math.round(num($('wmm').value, 100) * dpi / 25.4),
+    h: Math.round(num($('hmm').value, 50) * dpi / 25.4),
+    sizeMode: $('sizeMode').value, pplaOrigin: $('pplaOrigin').value
+  };
+}
+
+async function render() {
+  const src = $('src').value; const cfg = cfgFromUI();
+  try { localStorage.setItem('etq.src', src); } catch (e) {}
+  const stage = $('stage'), warnsEl = $('warns');
+  const warns = new Set(); const warn = m => warns.add(m);
+  if (!src.trim()) {
+    stage.innerHTML = '<div class="empty">Nenhuma etiqueta ainda.<br>Abra um arquivo, cole o código ou escolha um exemplo.</div>';
+    $('stLang').textContent = '—'; $('stSize').textContent = '—'; $('stCount').textContent = '—'; warnsEl.innerHTML = ''; return;
+  }
+  if (!window.bwipjs) { warn('Biblioteca de códigos de barras não carregou — verifique a conexão.'); }
+  try { await document.fonts.load(`700 20px "Roboto Condensed"`); await document.fonts.load(`700 20px "Roboto Mono"`); } catch (e) {}
+  let lang = $('lang').value; const auto = lang === 'auto'; if (auto) lang = detectLang(src);
+  let labels = [];
+  try {
+    if (lang === 'zpl') labels = await parseZPL(src, cfg, warn);
+    else if (lang === 'epl') labels = await parseEPL(src, cfg, warn);
+    else labels = await parsePPLA(src, cfg, warn);
+  } catch (e) { warn('Erro ao interpretar: ' + (e.message || e)); console.error(e); }
+  $('stLang').textContent = lang.toUpperCase() + (auto ? ' (auto)' : '');
+  $('stCount').textContent = labels.length + (labels.length === 1 ? ' etiqueta' : ' etiquetas');
+  stage.innerHTML = '';
+  if (!labels.length) stage.innerHTML = '<div class="empty">Nenhuma etiqueta encontrada no código.<br>Confira a linguagem selecionada.</div>';
+  const zoomSel = $('zoom').value, viewRot = +$('viewRot').value;
+  labels.forEach((lab, idx) => {
+    let canvas = renderLabel(lab);
+    if (viewRot) {
+      const sw = viewRot % 180 ? canvas.height : canvas.width, sh = viewRot % 180 ? canvas.width : canvas.height;
+      const r = newCanvas(sw, sh); const rc = r.getContext('2d');
+      rc.translate(sw / 2, sh / 2); rc.rotate(viewRot * Math.PI / 180); rc.drawImage(canvas, -canvas.width / 2, -canvas.height / 2); canvas = r;
+    }
+    const wrap = document.createElement('div'); wrap.className = 'labelwrap';
+    const paper = document.createElement('div'); paper.className = 'paper';
+    const img = new Image(); img.src = canvas.toDataURL('image/png'); img.alt = 'Etiqueta ' + (idx + 1);
+    let scale;
+    if (zoomSel === 'fit') { const avail = Math.max(200, stage.clientWidth - 70); scale = Math.min(avail / canvas.width, 1.6); }
+    else scale = +zoomSel;
+    img.style.width = Math.round(canvas.width * scale) + 'px'; img.style.height = Math.round(canvas.height * scale) + 'px';
+    img.addEventListener('mousemove', ev => {
+      const r = img.getBoundingClientRect();
+      let x = Math.floor((ev.clientX - r.left) / scale), y = Math.floor((ev.clientY - r.top) / scale);
+      $('coord').textContent = `x ${x} · y ${y} pontos`;
+    });
+    img.addEventListener('mouseleave', () => $('coord').textContent = '');
+    paper.appendChild(img); wrap.appendChild(paper);
+    const cap = document.createElement('div'); cap.className = 'cap';
+    const mmw = (lab.w / cfg.dpi * 25.4).toFixed(1), mmh = (lab.h / cfg.dpi * 25.4).toFixed(1);
+    const cp = lab.copies > 1 ? ` · ${lab.copies} cópias` : ' · 1 cópia';
+    cap.textContent = `Etiqueta ${idx + 1}${cp} — ${lab.w}×${lab.h} pontos (${mmw}×${mmh} mm)`;
+    const dl = document.createElement('a'); dl.className = 'btn'; dl.textContent = 'Baixar PNG';
+    dl.href = img.src; dl.download = `etiqueta-${idx + 1}.png`; dl.style.textDecoration = 'none';
+    wrap.appendChild(cap); wrap.appendChild(dl); stage.appendChild(wrap);
+    if (idx === 0) $('stSize').textContent = `${mmw}×${mmh} mm @ ${cfg.dpi} dpi`;
+  });
+  warnsEl.innerHTML = '';
+  for (const w of warns) { const d = document.createElement('div'); d.textContent = '⚠ ' + w; warnsEl.appendChild(d); }
+}
+function schedule() { clearTimeout(state.timer); state.timer = setTimeout(render, 250); }
+
+function loadFile(file) {
+  const fr = new FileReader();
+  fr.onload = () => {
+    const bytes = new Uint8Array(fr.result);
+    let txt;
+    try { txt = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+    catch (e) { txt = ''; for (let i = 0; i < bytes.length; i += 8192) txt += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)); }
+    $('src').value = txt; render();
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+$('btnOpen').onclick = () => $('file').click();
+$('file').onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ''; };
+$('btnClear').onclick = () => { $('src').value = ''; render(); };
+$('example').onchange = e => { const k = e.target.value; if (k) { $('src').value = EXAMPLES[k]; $('lang').value = 'auto'; render(); } e.target.value = ''; };
+$('src').addEventListener('input', schedule);
+['lang', 'dpi', 'wmm', 'hmm', 'sizeMode', 'pplaOrigin', 'viewRot', 'zoom'].forEach(id => $(id).addEventListener('change', render));
+const ta = $('src');
+ta.addEventListener('dragover', e => { e.preventDefault(); ta.classList.add('drop'); });
+ta.addEventListener('dragleave', () => ta.classList.remove('drop'));
+ta.addEventListener('drop', e => { e.preventDefault(); ta.classList.remove('drop'); const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+window.addEventListener('resize', () => { if ($('zoom').value === 'fit') schedule(); });
+
+(function init() {
+  let saved = null; try { saved = localStorage.getItem('etq.src'); } catch (e) {}
+  $('src').value = saved || EXAMPLES.zpl;
+  render();
+})();
+</script>
+</body>
+</html>
