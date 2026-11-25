@@ -29,7 +29,7 @@ fonts/*.woff2              fontes Roboto Condensed e Roboto Mono (licença Apach
 
 ## Publicar no GitHub Pages
 
-1. Crie um repositório no GitHub (ex.: `visualizador-etiquetas`).
+1. Crie um repositório no GitHub (ex.: `etiquetas`).
 2. Envie todos os arquivos desta pasta para a raiz do repositório.
 3. Em **Settings → Pages**, em *Build and deployment*, escolha **Deploy from a branch**, branch `main`, pasta `/ (root)` e salve.
-4. Em 1–2 minutos o site fica disponível em `https://SEU-USUARIO.github.io/visualizador-etiquetas/`.
+4. Em 1–2 minutos o site fica disponível em `https://SEU-USUARIO.github.io/etiquetas/`.
